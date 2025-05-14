@@ -1,0 +1,63 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Geliştirme Kuralları
+
+## Paket Yönetimi
+
+- Projedeki tüm paket yönetimi işlemleri için `pnpm` kullanılmalıdır
+- Paket yüklemek için: `pnpm add <paket-adi>`
+- Geliştirme bağımlılığı olarak eklemek için: `pnpm add -D <paket-adi>`
+
+## Stil ve Kod Standartları
+
+- **ESLint**: Kod standartları için ESLint kullanılmalıdır
+- **Tailwind**: Özel CSS dosyaları yerine Tailwind sınıfları tercih edilmelidir
+- **Türkçe İçerik**: Kullanıcı arayüzündeki tüm metinler Türkçe olmalıdır
+- **TypeScript**: Tüm kodlar TypeScript ile yazılmalıdır
+- **Dosya İsimlendirme**: kebab-case dosya isimleri kullanılmalıdır
+- **Bileşen İsimlendirme**: PascalCase bileşen isimleri kullanılmalıdır
+- **shadcn/ui Kullanımı**: shadcn/ui bileşenleri mümkün olduğunca değiştirilmeden kullanılmalıdır
+
+## Git İşlemleri
+
+- **Commit Mesajları**: Commit mesajları anlamlı ve Türkçe olmalıdır
+- **Branch İsimlendirme**: feature/, bugfix/, hotfix/ prefixleri kullanılmalıdır
+- **Merge Yerine Rebase**: Merge yerine rebase tercih edilmelidir
+
+## Yeni Bileşen Ekleme
+
+1. shadcn/ui CLI ile bileşen eklemek için:
+   ```bash
+   pnpm dlx shadcn-ui@latest add <bileşen-adı>
+   ```
+
+2. Özel bileşenler için src/components/ altında uygun klasörlere yerleştirilmelidir
+
+## Performans Optimizasyonları
+
+- **Image Optimizasyonu**: Next.js Image bileşeni kullanılmalıdır
+- **Code Splitting**: Büyük bileşenler için Dynamic Import kullanılmalıdır
+- **Lazy Loading**: Büyük bileşenler için Suspense/lazy loading kullanılmalıdır
+
+## Tema ve Tasarım
+
+- **Dark/Light Modu**: Her iki temada da düzgün görünüm sağlanmalıdır
+- **Responsive Tasarım**: Tüm sayfalar mobil cihazlarla uyumlu olmalıdır
+- **Erişilebilirlik**: WCAG standartlarına uygun geliştirme yapılmalıdır
+
+## Proje Yapısı Kuralları
+
+- **src/app/**: Sayfa bileşenleri burada olmalıdır
+- **src/components/**: Yeniden kullanılabilir UI bileşenleri burada olmalıdır
+- **src/components/ui/**: shadcn/ui bileşenleri burada olmalıdır
+- **src/lib/**: Yardımcı fonksiyonlar ve hooks burada olmalıdır
+- **public/**: Statik dosyalar burada olmalıdır
+
+## Geliştirme Ortamı
+
+- **Node.js**: En az v18.17.0 veya daha yeni bir sürüm kullanılmalıdır
+- **TypeScript**: En az 5.x sürümü kullanılmalıdır
+- **Next.js**: En az 15.x sürümü kullanılmalıdır

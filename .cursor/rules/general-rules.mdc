@@ -1,0 +1,74 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Projem - Next.js 15 + React 19 Proje Kuralları
+
+## Teknoloji Yığını
+
+- **Framework**: Next.js 15 (App Router)
+- **UI Kütüphanesi**: React 19 
+- **Bileşen Kütüphanesi**: shadcn/ui
+- **Stil Çözümü**: Tailwind CSS 4
+- **Paket Yöneticisi**: pnpm (tercih edilen)
+- **Dil**: TypeScript 5
+- **Animasyon**: tw-animate-css
+- **Build Aracı**: Turbopack (Next.js dev modunda)
+- **Tema**: next-themes
+- **Fonlar**: Geist (Sans ve Mono)
+- **Icon Kütüphanesi**: Lucide React
+- **Toast Bildirimleri**: Sonner
+
+## Proje Yapısı
+
+```
+src/
+├── app/              # App Router yapısı
+│   ├── globals.css   # Global stil tanımları
+│   ├── layout.tsx    # Root layout bileşeni
+│   └── page.tsx      # Ana sayfa
+├── components/       # Bileşenler
+│   └── ui/           # shadcn/ui bileşenleri
+└── lib/              # Yardımcı fonksiyonlar
+    └── utils.ts      # Tailwind sınıfları için cn yardımcı fonksiyonu
+```
+
+## Kod Kuralları
+
+- **Client-Side Rendering**: Use "use client"; direktifi ile client taraflı bileşenleri işaretleyin
+- **Import Alias Kullanımı**: @/ prefix'i ile import alias'ları kullanın (`@/components`, `@/lib` vb.)
+- **Tailwind CSS**: Stil tanımları için doğrudan sınıf adlarını kullanın (className="...")
+- **Bileşen İsimlendirmesi**: PascalCase kullanın
+- **shadcn/ui Bileşenleri**: Doğrudan @/components/ui'dan import edilmelidir
+- **Dil Desteği**: Türkçe UI metinleri kullanılmaktadır
+- **TypeScript**: React.ReactNode gibi uygun tip tanımlarını kullanın
+- **Fonlar**: Geist ve Geist_Mono fontları kullanın (layout'ta tanımlanmış)
+
+## Tema ve Renkler
+
+- **Tema Desteği**: Aydınlık/karanlık tema yapılandırması
+- **Renk Paleti**: OKLCH renk formatı kullanılmaktadır
+- **CSS Değişkenleri**: --primary, --secondary, --background vb. CSS değişkenleri kullanılmaktadır
+- **Renkler**: Slate temel rengi üzerine inşa edilmiştir
+
+## shadcn/ui Konfigürasyonu
+
+- **Stil**: New York stili
+- **RSC Desteği**: Aktif
+- **CSS Değişkenleri**: Aktif
+- **TSX**: Aktif
+- **CSS Dosyası**: src/app/globals.css
+- **Icon Kütüphanesi**: Lucide
+
+## Performans ve Optimizasyon
+
+- **Next.js Optimizasyonları**: Image bileşeni için priority özelliğini kullanın
+- **Turbopack**: Geliştirme ortamında Turbopack kullanın (`pnpm dev` komutu)
+
+## Komutlar
+
+- **Geliştirme**: `pnpm dev` (Turbopack ile)
+- **Build**: `pnpm build`
+- **Başlatma**: `pnpm start`
+- **Lint**: `pnpm lint`

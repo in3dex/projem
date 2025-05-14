@@ -1,0 +1,15 @@
+-- AlterTable
+ALTER TABLE "site_settings" ADD COLUMN     "appleTouchIconUrl" TEXT,
+ADD COLUMN     "contactWorkingHours" TEXT,
+ADD COLUMN     "defaultOpenGraphImageUrl" TEXT,
+ADD COLUMN     "footerScripts" TEXT,
+ADD COLUMN     "googleAnalyticsId" TEXT,
+ADD COLUMN     "googleMapsApiKey" TEXT,
+ADD COLUMN     "headerScripts" TEXT,
+ADD COLUMN     "logoDarkUrl" TEXT,
+ADD COLUMN     "maintenanceMessage" TEXT,
+ADD COLUMN     "maintenanceMode" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "seoKeywords" TEXT,
+ADD COLUMN     "showMapOnContactPage" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "socialTiktok" TEXT,
+ADD COLUMN     "socialWhatsapp" TEXT;

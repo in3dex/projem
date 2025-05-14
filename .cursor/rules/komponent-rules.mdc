@@ -1,0 +1,163 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# shadcn/ui Bileşenleri Kullanım Örnekleri
+
+Bu dosya, projedeki shadcn/ui bileşenlerinin nasıl kullanılacağını gösteren örnekler içerir.
+
+## Button Bileşeni
+
+```tsx
+import { Button } from "@/components/ui/button";
+
+// Temel kullanım
+<Button>Tıkla</Button>
+
+// Varyantlar
+<Button variant="default">Default</Button>
+<Button variant="secondary">Secondary</Button>
+<Button variant="destructive">Destructive</Button>
+<Button variant="outline">Outline</Button>
+<Button variant="ghost">Ghost</Button>
+<Button variant="link">Link</Button>
+
+// Boyutlar
+<Button size="default">Default</Button>
+<Button size="sm">Small</Button>
+<Button size="lg">Large</Button>
+
+// Olaylar
+<Button onClick={() => alert('Tıklandı!')}>Tıkla</Button>
+```
+
+## Card Bileşeni
+
+```tsx
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+
+<Card>
+  <CardHeader>
+    <CardTitle>Kart Başlığı</CardTitle>
+    <CardDescription>Kart açıklaması</CardDescription>
+  </CardHeader>
+  <CardContent>
+    <p>Kart içeriği</p>
+  </CardContent>
+  <CardFooter>
+    <Button>Kaydet</Button>
+  </CardFooter>
+</Card>
+```
+
+## Dialog Bileşeni
+
+```tsx
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+
+<Dialog>
+  <DialogTrigger asChild>
+    <Button variant="outline">Dialog Aç</Button>
+  </DialogTrigger>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Dialog Başlığı</DialogTitle>
+      <DialogDescription>
+        Bu bir dialog örneğidir. Formu doldurabilir veya kapatabilirsiniz.
+      </DialogDescription>
+    </DialogHeader>
+    <div className="grid gap-4 py-4">
+      <Input placeholder="Ad Soyad" />
+      <Input placeholder="Email" />
+    </div>
+    <DialogFooter>
+      <Button type="submit">Kaydet</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+```
+
+## Select Bileşeni
+
+```tsx
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+
+<Select>
+  <SelectTrigger>
+    <SelectValue placeholder="Şehir seçin" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="istanbul">İstanbul</SelectItem>
+    <SelectItem value="ankara">Ankara</SelectItem>
+    <SelectItem value="izmir">İzmir</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+## Input Bileşeni
+
+```tsx
+import { Input } from "@/components/ui/input";
+
+<Input placeholder="Adınızı girin" />
+<Input type="email" placeholder="Email adresinizi girin" />
+<Input type="password" placeholder="Şifrenizi girin" />
+```
+
+## Toast Bildirimleri
+
+```tsx
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+
+// Ana Layout bileşeninde Toaster'ı ekleyin
+<Toaster />
+
+// Toast göstermek için
+<Button onClick={() => toast("Form gönderildi!")}>Gönder</Button>
+
+// Varyantlar
+toast.success("İşlem başarılı!");
+toast.error("Bir hata oluştu!");
+toast.warning("Uyarı mesajı");
+toast.info("Bilgilendirme mesajı");
+```
+
+## Tailwind Yardımcı Fonksiyonu
+
+```tsx
+import { cn } from "@/lib/utils";
+
+// Koşullu sınıf adları
+<div className={cn(
+  "base-sinif", 
+  kosul && "kosullu-sinif",
+  {
+    "diger-sinif": baskaKosul
+  }
+)}>
+  İçerik
+</div>
+```

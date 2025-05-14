@@ -1,0 +1,15 @@
+.git
+.gitignore
+node_modules
+.next
+npm-debug.log
+README.md
+.env
+.env.local
+.env.production
+*.env
+# Projenize özel diğer dosyalar veya klasörler
+logs/
+*.log
+projem_yedek.tar.gz
+ftp-backups/

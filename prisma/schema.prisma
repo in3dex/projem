@@ -1,0 +1,1003 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client" // Explicit output path eklendi
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Önce Enum tanımı
+enum NotificationType {
+  ORDER_CREATED
+  ORDER_STATUS_UPDATE
+  ORDER_CANCELLED
+  ORDER_RETURNED
+  NEW_QUESTION
+  QUESTION_ANSWERED
+  API_CONNECTION_ERROR
+  GENERAL
+}
+
+enum Role {
+  USER
+  ADMIN
+  EDITOR
+}
+
+// Yeni Enum: Abonelik Durumu
+enum SubscriptionStatus {
+  ACTIVE // Aktif
+  INACTIVE // Pasif (henüz başlamamış veya bitmiş olabilir)
+  CANCELED // İptal edilmiş
+  PAST_DUE // Ödeme gecikmiş
+  TRIALING // Deneme süresinde
+  PENDING_PAYMENT // Yeni: Ödeme bekleniyor (EFT için)
+}
+
+// Yeni Enum: Fiyatlandırma Periyodu
+enum BillingInterval {
+  MONTH // Aylık
+  YEAR // Yıllık
+}
+
+// Yeni Enum: Limit Tipi
+enum LimitType {
+  PRODUCT_COUNT
+  ORDER_COUNT
+  USER_COUNT
+  // İhtiyaç duyulan diğer limit türleri buraya eklenebilir
+}
+
+// Yeni: Fatura Durumu Enum'u
+enum InvoiceStatus {
+  PENDING // Ödeme Bekliyor
+  PAID // Ödendi
+  OVERDUE // Gecikti
+  CANCELED // İptal Edildi
+}
+
+// YENİ: E-posta Şablon Türleri Enum'u
+enum EmailTemplateType {
+  WELCOME // Hoş Geldiniz E-postası
+  PASSWORD_RESET // Şifre Sıfırlama
+  ORDER_CONFIRMATION // Sipariş Onayı (Müşteriye)
+  ORDER_SHIPPED // Sipariş Kargolandı (Müşteriye)
+  NEW_ORDER_ADMIN // Yeni Sipariş Bildirimi (Admin'e)
+  QUESTION_ANSWERED // Soru Cevaplandı (Müşteriye)
+  // Yeni Abonelik Şablonları:
+  SUBSCRIPTION_STARTED
+  SUBSCRIPTION_CANCELED
+  PAYMENT_INSTRUCTIONS_EFT
+  PAYMENT_RECEIVED // Ödeme Alındı (EFT Onayı vb.)
+  PAYMENT_FAILED
+  SUBSCRIPTION_RENEWAL_REMINDER // Opsiyonel
+  // Diğer şablon türleri buraya eklenebilir
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+  PENDING_USER // Kullanıcıdan yanıt bekleniyor
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String // Hashlenmiş şifre
+  image         String? // Profil resmi URL'i
+  phone         String? // Telefon numarası
+  logoUrl       String? // Kullanıcının etiketler için logosu
+  companyName   String? // Yeni: Şirket/Mağaza Adı
+  address       String? // Yeni: Adres
+  role          Role      @default(USER)
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+
+  // Webhook yönetimi için yeni alanlar
+  webhookApiKey     String? @unique // Her kullanıcı için benzersiz webhook anahtarı
+  trendyolWebhookId String? // Trendyol tarafından oluşturulan webhook ID'si
+
+  // Mağaza/İşletme Bilgileri (Opsiyonel)
+  shopName String? // Mağaza Adı
+
+  // İlişkiler
+  apiSettings       ApiSettings?
+  barcodeSetting    BarcodeSetting? // Kullanıcının barkod ayarları
+  products          Product[] // Yeni: Ürünlerle ilişki
+  customerQuestions CustomerQuestion[] // Müşteri soruları ilişkisi eklendi
+  notifications     Notification[] // Yeni: Bildirimler ilişkisi eklendi
+  claims            TrendyolClaim[] // Yeni: İade talepleri ilişkisi eklendi
+  trendyolOrders    TrendyolOrder[] // Yeni: Trendyol siparişleri ile ilişki
+
+  // Bildirim Ayarları (Eski alan kaldırıldı)
+  // notifyOnOrderStatusUpdate Boolean @default(true) 
+  notificationPreferences Json? // Yeni: JSON formatında { "ORDER_STATUS_UPDATE": true, "NEW_QUESTION": false } gibi
+
+  // Yeni: Genel Maliyet Ayarları ile İlişki
+  generalCostSetting GeneralCostSetting? // Her kullanıcının bir maliyet ayarı olabilir (opsiyonel)
+
+  // Yeni: Barem Fiyatları ile İlişki
+  baremPrices BaremPrice[] // Karşı ilişki eklendi
+
+  // Yeni: Ürüne Özel Maliyet Ayarları ile İlişki
+  productCostSettings ProductCostSetting[]
+
+  // Yeni: Kategoriye Özel Komisyonlar ile İlişki
+  categoryCommissions CategoryCommission[]
+
+  // Yeni: Abonelik ilişkisi (bir kullanıcının bir aboneliği olabilir)
+  subscription Subscription?
+
+  // Yeni: Faturalar ile İlişki
+  invoices Invoice[]
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Yeni: Destek Talepleri ile İlişki
+  supportTickets  SupportTicket[] // Karşı ilişki eklendi
+  supportMessages SupportMessage[] // Karşı ilişki eklendi
+
+  @@index([email])
+  @@index([webhookApiKey]) // webhookApiKey için index
+  @@map("users") // Tablo adı
+}
+
+// Kullanıcının barkod etiket ayarları
+model BarcodeSetting {
+  id     String @id @default(cuid())
+  userId String @unique // Kullanıcı ile birebir ilişki
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Etikette yer alacak bilgiler
+  includeLogo             Boolean @default(false) // Logoyu etikete ekle
+  includeOrderNumber      Boolean @default(true)
+  includeCustomerName     Boolean @default(true)
+  includeCustomerAddress  Boolean @default(true)
+  includeProductList      Boolean @default(false) // includeProductInfo yerine: Ürün listesini ekle
+  includeShippingProvider Boolean @default(true) // Kargo firması adı (PTT Kargo vb.)
+  includeBarcodeText      Boolean @default(true) // Barkodun altında takip numarasını metin olarak göster
+
+  // Tasarım (şimdilik basit tutalım, ileride genişletilebilir)
+  barcodeType String @default("CODE128") // Genelde takip numaraları için Code 128 kullanılır
+  // paperSize              String   @default("A4") // Sabit A4 varsayalım
+  // barcodePosition        Json?    // Daha detaylı konumlandırma için JSON
+  // fontSize               Int?     // Font boyutu vb.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Trendyol API Ayarları
+model ApiSettings {
+  id        String @id @default(cuid())
+  sellerID  String
+  apiKey    String
+  apiSecret String
+
+  // İlişkiler
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("api_settings")
+}
+
+// Trendyol Siparişleri - Ana Tablo
+model TrendyolOrder {
+  id                    String   @id @default(cuid())
+  trendyolId            BigInt? // Trendyol'daki sipariş ID'si (artık optional)
+  orderNumber           String   @unique // Trendyol sipariş numarası (bu unique kalmalı)
+  orderDate             DateTime
+  status                String // Invoiced, Shipped, Delivered vb.
+  shipmentPackageStatus String // Paket durumu
+
+  // Fiyat bilgileri
+  grossAmount     Float
+  totalDiscount   Float
+  totalTyDiscount Float
+  totalPrice      Float
+  currencyCode    String // TRY vb.
+
+  // Teslimat bilgileri
+  cargoTrackingNumber        String?
+  cargoProviderName          String?
+  cargoTrackingLink          String?
+  deliveryType               String? // normal vb.
+  deliveryAddressType        String? // Shipment, CollectionPoint vb.
+  estimatedDeliveryStartDate DateTime?
+  estimatedDeliveryEndDate   DateTime?
+  agreedDeliveryDate         DateTime?
+  fastDelivery               Boolean   @default(false)
+  fastDeliveryType           String?
+
+  // Diğer bilgiler
+  identityNumber     String?
+  taxNumber          String?
+  invoiceLink        String?
+  commercial         Boolean  @default(false)
+  micro              Boolean  @default(false)
+  giftBoxRequested   Boolean  @default(false)
+  deliveredByService Boolean? @default(false)
+
+  // Zaman damgaları
+  originShipmentDate DateTime?
+  lastModifiedDate   DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Kullanıcı ile ilişki
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // İlişkiler
+  customer          TrendyolCustomer          @relation(fields: [customerId], references: [id])
+  customerId        String
+  shipmentAddress   TrendyolAddress           @relation("ShipmentAddress", fields: [shipmentAddressId], references: [id])
+  shipmentAddressId String
+  invoiceAddress    TrendyolAddress           @relation("InvoiceAddress", fields: [invoiceAddressId], references: [id])
+  invoiceAddressId  String
+  items             TrendyolOrderItem[]
+  statusHistory     TrendyolOrderStatus[]
+  shipmentPackages  TrendyolShipmentPackage[]
+
+  // Senkronizasyon bilgisi
+  isSynced Boolean @default(true)
+
+  @@index([userId])
+  @@index([orderDate])
+  @@index([status])
+  @@map("trendyol_orders")
+}
+
+// Yeni: Sipariş Paketleri Modeli
+model TrendyolShipmentPackage {
+  id                  String  @id @default(cuid())
+  trendyolPackageId   BigInt  @unique // Trendyol API'sinden gelen packageId
+  status              String // Paket durumu (örn: Created, Shipped)
+  cargoTrackingNumber String? // Kargo takip numarası (opsiyonel)
+  cargoProviderName   String? // Kargo firması adı (opsiyonel)
+
+  // Paket içindeki ürünlerle ilişki (opsiyonel, eğer gerekirse)
+  // items                 TrendyolOrderItem[] @relation("PackageItems")
+
+  // Ana siparişle ilişki
+  order   TrendyolOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("trendyol_shipment_packages")
+}
+
+// Sipariş Ürünleri
+model TrendyolOrderItem {
+  id         String @id @default(cuid())
+  trendyolId BigInt @unique // Trendyol'daki ürün ID'si (İade ilişkisi için unique olmalı)
+
+  // Ürün bilgileri
+  productCode   String
+  productName   String
+  merchantSku   String
+  barcode       String?
+  productSize   String?
+  productOrigin String?
+
+  // Miktar ve fiyat
+  quantity      Int
+  price         Float // Birim fiyat (indirimli)
+  amount        Float // Toplam tutar
+  discount      Float // İndirim tutarı
+  tyDiscount    Float // Trendyol indirim tutarı
+  vatBaseAmount Int // KDV oranı
+
+  // Durum bilgisi
+  orderLineItemStatusName String // Invoiced, Shipped vb.
+
+  // İlişkiler
+  order   TrendyolOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+
+  // Yeni: İade kalemleri ile ilişki
+  claimItems TrendyolClaimItem[]
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([barcode])
+  @@map("trendyol_order_items")
+}
+
+// Adresler
+model TrendyolAddress {
+  id         String @id @default(cuid())
+  trendyolId BigInt @unique // Trendyol'daki adres ID'si
+
+  // Kişi bilgileri  
+  firstName String
+  lastName  String
+  fullName  String
+  company   String?
+
+  // Adres bilgileri
+  address1       String
+  address2       String?
+  fullAddress    String
+  city           String
+  cityCode       Int?
+  district       String?
+  districtId     Int?
+  neighborhood   String?
+  neighborhoodId Int?
+  postalCode     String?
+  countryCode    String
+  phone          String?
+
+  // İlişkiler
+  shipmentOrders TrendyolOrder[] @relation("ShipmentAddress")
+  invoiceOrders  TrendyolOrder[] @relation("InvoiceAddress")
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("trendyol_addresses")
+}
+
+// Müşteriler
+model TrendyolCustomer {
+  id         String @id @default(cuid())
+  trendyolId BigInt @unique // Trendyol'daki müşteri ID'si
+  firstName  String
+  lastName   String
+  email      String
+
+  // İlişkiler
+  orders TrendyolOrder[]
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("trendyol_customers")
+}
+
+// Sipariş Durum Geçmişi
+model TrendyolOrderStatus {
+  id          String   @id @default(cuid())
+  status      String // Awaiting, Created, Invoiced, Shipped vb.
+  createdDate DateTime
+
+  // İlişkiler
+  order   TrendyolOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("trendyol_order_statuses")
+}
+
+// Marka Modeli
+model Brand {
+  id         String    @id @default(cuid())
+  trendyolId Int       @unique // API'den gelen brandId
+  name       String // API'den gelen brand adı
+  products   Product[] // Ürünlerle ilişki
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("brands")
+}
+
+// Kategori Modeli
+model Category {
+  id         String    @id @default(cuid())
+  trendyolId Int       @unique // API'den gelen pimCategoryId
+  name       String // API'den gelen categoryName
+  products   Product[] // Ürünlerle ilişki
+
+  // Yeni: Kategoriye Özel Komisyonlar ile İlişki
+  commissions CategoryCommission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+// Ürün Modeli (Ana Ürün Bilgileri) - Her Trendyol listesi ayrı bir ürün olarak güncellendi
+model Product {
+  id     String @id @default(cuid())
+  userId String // Bu ürüne sahip kullanıcıyla ilişki
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Trendyol'a Özgü ID'ler & Kodlar
+  trendyolId        String  @unique // API'den gelen id (varyant/listeleme ID'si)
+  productMainId     String // API'den gelen productMainId (Bilgi olarak kalsın, unique değil)
+  trendyolContentId Int? // API'den gelen productContentId (@unique kaldırıldı)
+  barcode           String  @unique // API'den gelen barcode
+  stockCode         String? // API'den gelen stockCode (Satıcı SKU)
+  platformListingId String? // API'den gelen platformListingId
+  productCode       Int? // API'den gelen productCode
+
+  // Marka & Kategori İlişkileri
+  brandId    String // Marka ile ilişki
+  brand      Brand    @relation(fields: [brandId], references: [id])
+  categoryId String // Kategori ile ilişki
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  // Temel Ürün/Varyant Bilgileri
+  title             String // API'den gelen title
+  description       String? // API'den gelen description (uzun metin olabilir)
+  listPrice         Float // API'den gelen listPrice
+  salePrice         Float // API'den gelen salePrice
+  costPrice         Float? // Birim maliyet (Bizim eklediğimiz)
+  quantity          Int // API'den gelen quantity
+  vatRate           Float // API'den gelen vatRate
+  dimensionalWeight Float? // API'den gelen dimensionalWeight
+  stockUnitType     String? // API'den gelen stockUnitType
+  productUrl        String? // API'den gelen productUrl
+  hasHtmlContent    Boolean? // API'den gelen hasHtmlContent
+
+  // API'den Gelen Durumlar & İşaretler
+  approved          Boolean  @default(false)
+  archived          Boolean  @default(false)
+  locked            Boolean  @default(false)
+  onSale            Boolean  @default(false)
+  rejected          Boolean  @default(false)
+  blacklisted       Boolean  @default(false)
+  hasActiveCampaign Boolean?
+
+  // JSON olarak saklanacak karmaşık veriler
+  images              Json // API'den gelen images dizisi
+  attributes          Json // API'den gelen attributes dizisi
+  rejectReasonDetails Json? // API'den gelen rejectReasonDetails dizisi
+
+  // Yeni: Hesaplanan tavsiye satış fiyatı
+  recommendedSalePrice Float? @map("recommended_sale_price") // Opsiyonel float alan
+
+  // API'den Gelen Zaman Damgaları
+  trendyolCreateDateTime DateTime? // API'den gelen createDateTime
+  trendyolLastUpdateDate DateTime? // API'den gelen lastUpdateDate
+
+  // Dahili Zaman Damgaları & İlişkiler
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  customerQuestions CustomerQuestion[] // Müşteri soruları ilişkisi eklendi
+
+  // Yeni: GeneralCostSetting ile ilişki (Opsiyonel)
+  generalCostSettingId String?
+  generalCostSetting   GeneralCostSetting? @relation(fields: [generalCostSettingId], references: [id], onDelete: SetNull)
+
+  // Yeni: Ürüne Özel Maliyet Ayarı ile İlişki (One-to-Many)
+  costSettings ProductCostSetting[] // Karşı ilişki düzeltildi (One-to-Many)
+
+  @@index([userId])
+  @@index([barcode])
+  @@index([stockCode])
+  @@index([approved])
+  @@index([archived])
+  @@index([onSale])
+  @@index([brandId])
+  @@index([categoryId])
+  @@index([quantity])
+  @@map("products")
+}
+
+// Müşteri Soruları Modeli
+model CustomerQuestion {
+  id                 String    @id @default(cuid())
+  userId             String // Relation to User
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trendyolQuestionId BigInt    @unique // Trendyol's question ID
+  questionText       String
+  answerText         String?
+  status             String // Status from Trendyol (WAITING_FOR_ANSWER, ANSWERED etc.)
+  askedDate          DateTime // creationDate from Trendyol
+  answeredDate       DateTime? // answer.creationDate from Trendyol
+  trendyolAnswerId   BigInt? // answer.id from Trendyol
+  customerName       String? // userName (nullable if showUserName is false)
+  showUserName       Boolean
+  productName        String // productName from Trendyol
+  productImageUrl    String? // imageUrl from Trendyol
+  productId          String? // Relation to our Product model
+  product            Product?  @relation(fields: [productId], references: [id], onDelete: SetNull) // Link to our product, SetNull if product deleted
+  webUrl             String? // webUrl from Trendyol
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([productId])
+  @@map("customer_questions")
+}
+
+// Yeni Notification Modeli
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       NotificationType
+  message    String
+  isRead     Boolean          @default(false)
+  relatedId  String?
+  relatedUrl String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// İade Yönetimi Modelleri
+
+model TrendyolClaim {
+  id     String @id @default(cuid())
+  userId String // Kullanıcı ile ilişki
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  trendyolClaimId String   @unique // Trendyol API'den gelen claim ID (UUID formatında string)
+  orderNumber     String // İlgili siparişin Trendyol numarası
+  orderDate       DateTime // Sipariş tarihi (Trendyol API'den)
+
+  customerFirstName String?
+  customerLastName  String?
+  claimDate         DateTime // İade talebi oluşturulma tarihi (Trendyol API'den)
+
+  // Kargo Bilgileri (İade gönderimi)
+  cargoTrackingNumber String?
+  cargoProviderName   String?
+  cargoSenderNumber   String?
+  cargoTrackingLink   String?
+
+  // Reddedilen/Değişim Paket Bilgileri (JSON olarak saklanacak)
+  rejectedPackageInfo    Json?
+  replacementPackageInfo Json?
+
+  lastModifiedDate DateTime // Son güncellenme tarihi (Senkronizasyon için önemli)
+
+  // İlişkiler
+  claimItems TrendyolClaimItem[] // Bu iade talebine ait kalemler
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@map("trendyol_claims")
+}
+
+model TrendyolClaimItem {
+  id      String        @id @default(cuid())
+  claimId String // Ana iade talebi ile ilişki
+  claim   TrendyolClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  trendyolClaimItemId String @unique // Trendyol API'den gelen claim item ID (UUID formatında string)
+
+  // İlgili Sipariş Kalemi Bilgileri (Trendyol API'den gelen)
+  trendyolOrderLineId     BigInt? // API'deki orderLine.id (emin olmak için nullable)
+  trendyolOrderLineItemId BigInt // API'deki claimItems[].orderLineItemId (Bu TrendyolOrderItem.trendyolId ile eşleşmeli)
+
+  // Opsiyonel: Veritabanımızdaki TrendyolOrderItem ile ilişki
+  trendyolOrderItemId String? // TrendyolOrderItem tablosundaki ID
+  trendyolOrderItem   TrendyolOrderItem? @relation(fields: [trendyolOrderItemId], references: [id], onDelete: SetNull) // Ürün silinirse ilişkiyi kopar ama iade kaydı kalsın
+
+  // Ürün Bilgileri (API'den geldiği gibi)
+  productName     String
+  barcode         String?
+  merchantSku     String?
+  productColor    String?
+  productSize     String?
+  price           Float // İade edilen ürünün fiyatı
+  vatBaseAmount   Float?
+  productCategory String?
+
+  // İade Nedenleri
+  customerReasonId   Int?
+  customerReasonName String?
+  customerReasonCode String?
+  trendyolReasonId   Int?
+  trendyolReasonName String?
+  trendyolReasonCode String?
+
+  // Durum ve Notlar
+  status           String // Created, Accepted, Rejected vb.
+  note             String? // Satıcının notu
+  customerNote     String? // Müşterinin notu
+  resolved         Boolean // İade sonuçlandı mı?
+  autoAccepted     Boolean? // Otomatik kabul edildi mi?
+  acceptedBySeller Boolean? // Satıcı tarafından manuel kabul edildi mi?
+  autoApproveDate  DateTime? // Otomatik onay tarihi
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([claimId])
+  @@index([status])
+  @@index([trendyolOrderLineItemId])
+  @@map("trendyol_claim_items")
+}
+
+// Yeni Model: Genel Maliyet Ayarları
+model GeneralCostSetting {
+  id                             String   @id @default(cuid())
+  userId                         String   @unique
+  user                           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultShippingCost            Float? // Varsayılan Kargo Maliyeti (TL) - Barem dışı fallback
+  defaultCommissionRate          Float? // Varsayılan Komisyon Oranı (%)
+  defaultTaxRate                 Float? // Varsayılan Stopaj Oranı (%)
+  defaultAdditionalCost          Float? // Varsayılan Ek Masraf (TL, KDV Hariç) - Paketleme vb.
+  defaultCarrierName             String? // Varsayılan Kargo Firması - Fallback için
+  defaultDesi                    Float? // Varsayılan Desi - Fallback veya barem hesaplaması için
+  defaultProfitCalculationMethod String?  @default("MARGIN") // MARGIN veya MARKUP
+  defaultProfitRate              Float? // Varsayılan Kar Oranı (%)
+  salesVatRate                   Float?   @default(20) // Satış KDV Oranı (%)
+  shippingVatRate                Float?   @default(20) // Kargo KDV Oranı (%)
+  commissionVatRate              Float?   @default(20) // Komisyon KDV Oranı (%)
+  serviceFeeAmount               Float?   @default(8.49) // Yeni: Hizmet Bedeli Tutarı (TL, KDV Hariç)
+  serviceFeeVatRate              Float?   @default(20) // Yeni: Hizmet Bedeli KDV Oranı (%)
+  costVatRate                    Float? // Maliyet KDV Oranı (%) - Opsiyonel
+  includeCostVat                 Boolean? @default(false) // Maliyet KDV'si gidere dahil edilsin mi?
+
+  products Product[] // Eksik olan ilişki alanı geri eklendi
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("general_cost_settings")
+}
+
+// Yeni: Kullanıcıya Özel Barem Fiyatları Modeli
+model BaremPrice {
+  id     String @id @default(cuid())
+  userId String // Hangi kullanıcıya ait
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  carrierName   String // Kargo Firması Adı (örn: "PTT", "ARAS")
+  minOrderValue Float // Sipariş Tutarı Alt Limiti (dahil, örn: 0 veya 150)
+  maxOrderValue Float // Sipariş Tutarı Üst Limiti (hariç, örn: 150 veya 250)
+  maxDesi       Float? // Uygulanacak Maksimum Desi (null ise desiye bakılmaz)
+  priceExclVat  Float // Bu kural için KDV Hariç Kargo Fiyatı (TL)
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("barem_prices")
+}
+
+// Yeni: Ürüne Özel Maliyet Ayarları
+model ProductCostSetting {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Genel ayarlardaki alanları opsiyonel olarak override et
+  shippingCost   Float? // Özel Kargo Maliyeti (TL)
+  additionalCost Float? // Özel Ek Masraf (TL)
+  commissionRate Float? // Özel Komisyon Oranı (%)
+  taxRate        Float? // Özel Stopaj Oranı (%)
+  // Gelecekte eklenebilir: Özel KDV oranları vb.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId]) // Her kullanıcı her ürün için en fazla bir ayar yapabilir
+  @@map("product_cost_settings")
+}
+
+// Yeni: Kategoriye Özel Komisyon Oranı
+model CategoryCommission {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  commissionRate Float // Bu kategori için özel komisyon oranı (%)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, categoryId]) // Her kullanıcı her kategori için en fazla bir komisyon belirleyebilir
+  @@map("category_commissions")
+}
+
+// --- Abonelik Sistemi Modelleri ---
+
+// Abonelik Planları Modeli
+model Plan {
+  id                   String  @id @default(cuid())
+  name                 String // Plan adı (örn: Başlangıç, Profesyonel)
+  description          String? // Plan açıklaması
+  priceMonthly         Float? // Aylık fiyat (yıllık varsa bu opsiyonel olabilir)
+  priceYearly          Float? // Yıllık fiyat (aylık varsa bu opsiyonel olabilir)
+  currency             String  @default("TRY") // YENİ: Para birimi
+  features             Json? // Plan özellikleri (JSON dizisi olarak - String[] yerine)
+  isActive             Boolean @default(true) // Plan aktif mi?
+  stripePriceIdMonthly String? @unique // Stripe aylık fiyat ID'si
+  stripePriceIdYearly  String? @unique // Stripe yıllık fiyat ID'si
+
+  // --- YENİ: Limit Alanları ---
+  maxProducts      Int? // Maksimum ürün sayısı limiti (null = limitsiz)
+  maxMonthlyOrders Int? // Aylık maksimum sipariş limiti (null = limitsiz)
+
+  // İlişkiler
+  subscriptions Subscription[] // Bu plana ait abonelikler
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("plans")
+}
+
+// Kullanıcı Abonelikleri Modeli
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String             @unique // Bir kullanıcının sadece bir aktif aboneliği olabilir
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               Plan               @relation(fields: [planId], references: [id])
+  status             SubscriptionStatus
+  billingInterval    BillingInterval    @default(MONTH)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  trialEndsAt        DateTime? // Deneme süresi bitiş tarihi
+  activatedAt        DateTime? // Aboneliğin aktifleştiği tarih
+  canceledAt         DateTime? // Aboneliğin iptal edildiği tarih
+  cancelAtPeriodEnd  Boolean            @default(false) // Dönem sonunda mı iptal edilecek?
+  paymentMethod      String? // eft, stripe, paytr vb.
+  paymentProvider    String? // Yeni: Ödeme sağlayıcı (PAYTR, STRIPE, EFT)
+  paymentIntentId    String? // Yeni: Ödeme sağlayıcısının işlem ID'si (PayTR merchant_oid, Stripe payment_intent_id vb.)
+
+  // İlişkiler
+  invoices Invoice[] // Bir aboneliğin birden fazla faturası olabilir
+
+  // Zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+// YENİ: Banka Hesapları Modeli
+model BankaHesabi {
+  id            String  @id @default(cuid())
+  bankaAdi      String // Banka Adı (örn: Garanti BBVA)
+  subeKodu      String? // Şube Kodu (isteğe bağlı)
+  hesapNumarasi String? // Hesap Numarası (isteğe bağlı, IBAN varken)
+  iban          String  @unique // IBAN (unique olmalı)
+  hesapSahibi   String // Hesap Sahibi Adı
+  isActive      Boolean @default(true) // Hesap aktif mi? Yönetim panelinden aç/kapa
+
+  // İlişki (Eğer belirli ayarlara bağlıysa eklenebilir, şimdilik bağımsız)
+  // odemeAyarlari OdemeAyarlari? @relation(fields: [odemeAyarlariId], references: [id])
+  // odemeAyarlariId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("banka_hesaplari")
+}
+
+// YENİ: Genel Ödeme Ayarları Modeli (Sistemde tek bir kayıt olacak şekilde)
+model OdemeAyarlari {
+  id          String  @id @default("singleton") // Ayarlar için tek bir ID kullanıyoruz
+  eftAktif    Boolean @default(false) // Banka Havalesi / EFT aktif mi?
+  paytrAktif  Boolean @default(false) // YENİ: PayTR aktif mi?
+
+  // YENİ: PayTR API Bilgileri (Veritabanında saklanacak)
+  paytrMerchantId  String? // PayTR Mağaza No
+  paytrMerchantKey String? // PayTR Mağaza Anahtarı
+  paytrMerchantSalt String? // PayTR Mağaza Gizli Anahtar
+  paytrIframeUrl   String? @default("https://www.paytr.com/odeme/api/get-token") // YENİ: PayTR Iframe URL
+  paytrTestMode    String? @default("0") // YENİ: PayTR Test Modu ("0" canlı, "1" test)
+
+  // Stripe vb. için gelecek ayarlar
+  // stripeAktif Boolean @default(false)
+
+  // İlişkiler (Eğer BankaHesabi ile ilişki kurmak isterseniz)
+  // bankaHesaplari BankaHesabi[]
+
+  // Yönetim kolaylığı için zaman damgaları
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("odeme_ayarlari")
+}
+
+// Yeni: Fatura Modeli
+model Invoice {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId String // İlişkili abonelik
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade) // Abonelik silinirse fatura da silinsin (veya Restrict)
+  planName       String // Fatura anındaki plan adı (Plan değişirse diye)
+  amount         Float // Fatura tutarı
+  currency       String // Para birimi (örn: TRY)
+  status         InvoiceStatus @default(PENDING)
+  issueDate      DateTime      @default(now()) // Faturanın oluşturulma tarihi
+  dueDate        DateTime // Son ödeme tarihi
+  paidAt         DateTime? // Ödenme tarihi
+  paymentMethod  String? // Ödeme yöntemi (örn: 'eft', 'stripe')
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+// Yeni: E-posta Şablonları Modeli
+model EmailTemplate {
+  id          String            @id @default(cuid())
+  type        EmailTemplateType @unique // Hangi tür e-posta için şablon (örn: WELCOME, PASSWORD_RESET)
+  subject     String // E-posta konusu
+  htmlBody    String // E-posta içeriği (HTML formatında)
+  description String? // Şablonun amacı hakkında kısa açıklama (Admin paneli için)
+  isActive    Boolean           @default(true) // Şablon aktif olarak kullanılıyor mu?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("email_templates")
+}
+
+// Yeni: SMTP Ayarları Modeli (Singleton)
+model SmtpSettings {
+  id        String   @id @default("singleton") // Singleton pattern ile tek kayıt
+  host      String
+  port      Int
+  secure    Boolean  @default(false)
+  username  String?
+  password  String?
+  from      String   @default("info@domain.com")
+  fromName  String   @default("Sistem")
+  updatedAt DateTime @updatedAt
+}
+
+// Yeni eklenen otomasyon ayarları modeli
+model AutomationSettings {
+  id String @id @default("singleton") // Singleton pattern
+
+  // Fatura & Abonelik Zamanlaması
+  invoiceGenerationDaysBeforeEnd     Int @default(7) // Abonelik bitmeden kaç gün önce fatura oluşturulacak
+  invoiceDueDays                     Int @default(7) // Fatura oluştuktan kaç gün sonra son ödeme tarihi
+  overdueMarkDays                    Int @default(3) // Son ödeme tarihinden kaç gün sonra gecikmiş işaretlenecek
+  cancelSubscriptionAfterOverdueDays Int @default(30) // Gecikme sonrası kaç gün sonra abonelik iptal edilecek
+
+  // Yeni: Otomatik E-posta Bildirim Ayarları
+  sendSubscriptionEndingSoonEmail Boolean @default(true) // Abonelik bitimine yakın uyarı e-postası gönderilsin mi?
+  daysBeforeEndingToSendEmail     Int     @default(7) // Abonelik bitiminden kaç gün önce uyarı e-postası gönderilsin?
+  sendPaymentOverdueEmail         Boolean @default(true) // Ödeme geciktiğinde e-posta gönderilsin mi?
+  sendSubscriptionCancelledEmail  Boolean @default(true) // Abonelik iptal edildiğinde (ödeme yokluğu nedeniyle) e-posta gönderilsin mi?
+
+  // Yeni: Senkronizasyon Ayarları
+  syncEnabled           Boolean   @default(false) // Otomatik senkronizasyon aktif mi?
+  syncIntervalHours     Int       @default(24) // Senkronizasyon sıklığı (saat olarak)
+  syncOrders            Boolean   @default(true) // Siparişler senkronize edilsin mi?
+  syncProducts          Boolean   @default(true) // Ürünler senkronize edilsin mi?
+  syncClaims            Boolean   @default(true) // İade talepleri senkronize edilsin mi?
+  syncCustomerQuestions Boolean   @default(true) // Müşteri soruları senkronize edilsin mi?
+  lastSyncTime          DateTime? // Son senkronizasyon zamanı
+
+  updatedAt DateTime @updatedAt
+}
+
+model SupportTicket {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String
+  status    TicketStatus   @default(OPEN)
+  priority  TicketPriority @default(MEDIUM)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  messages SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model SupportMessage {
+  id             String        @id @default(cuid())
+  ticketId       String
+  ticket         SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId         String // Mesajı gönderen kullanıcı (admin veya normal kullanıcı olabilir)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content        String // @db.Text kaldırıldı, SQLite için gereksiz
+  isAdminMessage Boolean       @default(false) // Mesajın admin tarafından mı gönderildiğini belirtir
+  attachments    Json? // Yeni: Dosya ekleri için JSON alanı (örn: [{ name: 'hata.png', url: '/uploads/...' }])
+  createdAt      DateTime      @default(now())
+
+  @@index([ticketId])
+  @@index([userId])
+}
+
+model SiteSettings {
+  id              String  @id @default(cuid())
+  siteName        String?
+  logoUrl         String?
+  logoDarkUrl     String? // Yeni: Dark mod için logo
+  faviconUrl      String?
+  appleTouchIconUrl String? // Yeni: Apple touch icon
+  seoTitle        String?
+  seoDescription  String?
+  seoKeywords     String? // Yeni: Virgülle ayrılmış anahtar kelimeler
+  googleAnalyticsId String? // Yeni: Google Analytics ID
+  defaultOpenGraphImageUrl String? // Yeni: Varsayılan OG image
+
+  // İletişim Bilgileri
+  contactAddress  String?
+  contactPhone    String?
+  contactEmail    String?
+  contactWorkingHours String? // Yeni: Çalışma saatleri (örn: H.içi 09-18)
+  contactMapLat   String? // Harita için enlem
+  contactMapLng   String? // Harita için boylam
+  googleMapsApiKey String? // Yeni: Google Maps API Key (client-side kullanım için)
+  showMapOnContactPage Boolean @default(true) // Yeni: Haritayı iletişim sayfasında göster
+
+  // Sosyal Medya Linkleri
+  socialFacebook  String?
+  socialInstagram String?
+  socialX         String? // Twitter (X)
+  socialLinkedin  String?
+  socialYoutube   String?
+  socialTiktok    String? // Yeni: TikTok URL
+  socialWhatsapp  String? // Yeni: WhatsApp linki (örn: https://wa.me/905xxxxxxxxx)
+
+  // Footer metni gibi ek ayarlar eklenebilir
+  footerText      String?
+
+  // Bakım Modu
+  maintenanceMode Boolean @default(false) // Yeni: Bakım modu aktif mi?
+  maintenanceMessage String? // Yeni: Bakım modu mesajı
+  
+  // Ek Scriptler
+  headerScripts String? // Yeni: <head> içine eklenecek scriptler
+  footerScripts String? // Yeni: <body> sonuna eklenecek scriptler
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
+}

@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+  app:
+    image: projem-docker  # Daha önce build ettiğimiz imajın adı
+    container_name: projem-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/trendentegresql?schema=public"
+      NEXTAUTH_URL: "http://localhost:3000"
+      NEXTAUTH_SECRET: "COK_GUCLU_BIR_GIZLI_ANAHTAR"
+      BCRYPT_SALT_ROUNDS: "10"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      CRON_SECRET: "4655674895632524FDS5HJU56U5N4G34J"
+      AUTH_TRUST_HOST: "true"
+    depends_on:
+      - db
+    networks:
+      - projem-network
+
+  db:
+    image: postgres:15-alpine
+    container_name: projem-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: trendentegresql
+    volumes:
+      - projem_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # Host port 5433, container port 5432
+    networks:
+      - projem-network
+
+volumes:
+  projem_pgdata:
+    driver: local
+
+networks:
+  projem-network:
+    driver: bridge 
